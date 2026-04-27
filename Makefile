@@ -1,4 +1,4 @@
-.PHONY: setup proxy stop restart test claude doctor purge-claude-mem
+.PHONY: setup proxy stop restart test claude doctor
 
 setup:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env. Fill Azure OpenAI values before running proxy."; else echo ".env already exists."; fi
@@ -29,6 +29,3 @@ doctor:
 	@command -v uvx >/dev/null && uvx --version || (echo "uvx not found" && exit 1)
 	@echo "Checking local .env..."
 	@./scripts/ensure-env.sh >/dev/null && echo "env ok"
-
-purge-claude-mem:
-	./scripts/purge-claude-mem.sh

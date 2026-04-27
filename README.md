@@ -166,24 +166,6 @@ model_list:
 
 `make proxy`를 실행하면 `.env` 값을 읽어서 `.generated/litellm.config.yaml`을 만들고 LiteLLM을 실행합니다.
 
-## 연결은 됐는데 이상한 답변이 나오는 경우
-
-프록시 로그에 아래처럼 `200 OK`가 보이면 연결 자체는 된 것입니다.
-
-```text
-POST /v1/messages?beta=true HTTP/1.1" 200 OK
-```
-
-그런데 단순 인사에도 `I'm sorry, but I cannot assist with that request.` 같은 답변이 나오면 보통 연결 문제가 아니라 Claude Code의 전역 훅/플러그인/메모리 컨텍스트가 OpenAI 계열 모델과 맞지 않게 섞인 상태입니다.
-
-먼저 `claude-mem` 같은 메모리 플러그인이 남아 있는지 정리합니다.
-
-```bash
-make purge-claude-mem
-```
-
-이미 열려 있는 Claude Code 화면에서는 `/exit`로 종료한 뒤 다시 실행하는 것이 가장 깔끔합니다.
-
 ## Azure OpenAI 프록시 사용 시 안정화 원칙
 
 이 방식은 Claude Code의 공식 Azure OpenAI 네이티브 연동이 아닙니다. Claude Code는 Anthropic 모델과 Anthropic tool/use 메시지 형식을 기준으로 만들어져 있고, LiteLLM이 그 요청을 Azure OpenAI 요청으로 변환합니다.
@@ -192,26 +174,8 @@ make purge-claude-mem
 
 - 프록시 실행은 이 레포의 `make claude` 또는 `scripts/claude-via-azure-openai.sh`로만 시작합니다.
 - 기존 Claude Code 전역 설정은 그대로 사용합니다.
-- 메모리/관측/자동요약 플러그인은 OpenAI 계열 모델에서 토큰 사용량과 오류를 크게 늘릴 수 있으므로 끕니다.
 - Claude Code 고급 기능 중 일부는 Anthropic 모델 기준으로 동작하므로, Azure OpenAI에서는 간단한 코드 작업부터 검증합니다.
 - 문제가 생기면 먼저 `make test`로 LiteLLM 연결을 확인하고, 그 다음 `make claude`로 Claude Code 레벨을 확인합니다.
-
-### claude-mem 완전 제거
-
-`claude-mem`이 설치되어 있으면 세션 시작, 프롬프트 제출, 도구 사용마다 메모리 훅이 붙어서 토큰 사용량이 크게 늘 수 있습니다. 또한 플러그인 디렉터리를 삭제한 뒤 레지스트리가 남아 있으면 아래 같은 오류가 계속 납니다.
-
-```text
-Failed to run: Plugin directory does not exist:
-~/.claude/plugins/cache/thedotmack/claude-mem/...
-```
-
-이 경우 아래 명령으로 `claude-mem` 설정, 레지스트리, 캐시, 데이터, 실행 프로세스를 제거합니다.
-
-```bash
-make purge-claude-mem
-```
-
-이미 떠 있는 Claude Code 세션은 플러그인을 메모리에 들고 있을 수 있으므로 모두 종료한 뒤 새로 실행하세요.
 
 ## 자주 나는 오류
 
@@ -295,14 +259,6 @@ The API deployment for this resource does not exist
 ```bash
 AZURE_DEPLOYMENT_NAME=your-gpt-55-deployment-name
 ```
-
-## 팀 공유 시 주의사항
-
-- `.env`는 절대 GitHub에 올리지 않습니다.
-- 팀원은 각자 `.env.example`을 복사해서 자신의 `.env`를 만듭니다.
-- `LITELLM_MASTER_KEY`는 로컬 프록시 접근용 키입니다. 개인 로컬 사용이면 기본값을 써도 됩니다.
-- 여러 명이 공용 서버에서 프록시를 공유한다면 `LITELLM_MASTER_KEY`를 반드시 바꾸고 접근 제어를 따로 설정하세요.
-- 기본 프록시 주소는 `127.0.0.1`입니다. 외부 접속을 열어야 하는 상황이 아니라면 변경하지 마세요.
 
 ## Windows 제한망/폐쇄망 배포 가이드
 
@@ -556,22 +512,6 @@ curl.exe http://127.0.0.1:4000/v1/messages `
 - `DISABLE_TELEMETRY=1`을 설정했습니다.
 - `CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1`을 설정했습니다.
 - 필요한 플러그인은 내부망에 사전 배포했습니다.
-- `claude-mem` 같은 토큰 과다 사용 플러그인은 제외했습니다.
-
-## GitHub에 올리는 방법
-
-처음 원격 저장소를 만들 때:
-
-```bash
-gh repo create claude-code-azure-openai-proxy --private --source=. --remote=origin --push
-```
-
-이미 원격 저장소가 있다면:
-
-```bash
-git remote add origin <github-repo-url>
-git push -u origin main
-```
 
 ## 참고 문서
 
