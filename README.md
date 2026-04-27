@@ -124,6 +124,18 @@ Claude Code는 Claude Code 화면에서 종료합니다.
 
 프록시는 `make proxy`가 실행 중인 터미널에서 `Ctrl-C`로 종료합니다.
 
+터미널을 잃어버렸거나 예전 프록시가 계속 살아 있으면 아래 명령으로 4000번 포트의 프록시를 종료할 수 있습니다.
+
+```bash
+make stop
+```
+
+프록시를 완전히 재시작하려면 아래 명령을 씁니다.
+
+```bash
+make restart
+```
+
 ## 내부 동작 방식
 
 `scripts/claude-via-azure-openai.sh`는 Claude Code 실행 전에 아래 환경변수를 설정합니다.
@@ -171,11 +183,7 @@ AZURE_API_VERSION=2025-03-01-preview
 그 다음 프록시를 재시작합니다.
 
 ```bash
-# make proxy가 실행 중인 터미널에서
-Ctrl-C
-
-# 다시 실행
-make proxy
+make restart
 ```
 
 ### 2. Auth conflict 경고

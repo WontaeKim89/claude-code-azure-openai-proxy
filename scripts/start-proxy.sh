@@ -16,6 +16,7 @@ sed \
 
 printf 'Starting LiteLLM proxy on http://%s:%s\n' "${LITELLM_HOST}" "${LITELLM_PORT}"
 printf 'Exposing model alias: %s -> azure/%s\n' "${CLAUDE_CODE_MODEL_ALIAS}" "${AZURE_DEPLOYMENT_NAME}"
+printf 'Azure API version: %s\n' "${AZURE_API_VERSION}"
 
 exec uvx \
   --from 'litellm[proxy]!=1.82.7,!=1.82.8' \
