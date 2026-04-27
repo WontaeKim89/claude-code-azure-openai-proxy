@@ -35,6 +35,12 @@ if (( ${#missing[@]} > 0 )); then
   exit 1
 fi
 
+if [[ "${AZURE_API_VERSION}" < "2025-03-01-preview" ]]; then
+  printf 'AZURE_API_VERSION must be 2025-03-01-preview or later for Azure OpenAI Responses API.\n' >&2
+  printf 'Current value: %s\n' "${AZURE_API_VERSION}" >&2
+  exit 1
+fi
+
 export ROOT_DIR
 export LITELLM_HOST="${LITELLM_HOST:-127.0.0.1}"
 export LITELLM_PORT="${LITELLM_PORT:-4000}"

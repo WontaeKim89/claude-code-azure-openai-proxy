@@ -5,7 +5,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ensure-env.sh"
 
 export ANTHROPIC_BASE_URL="http://${LITELLM_HOST}:${LITELLM_PORT}"
 export ANTHROPIC_AUTH_TOKEN="${LITELLM_MASTER_KEY}"
-export ANTHROPIC_API_KEY="${LITELLM_MASTER_KEY}"
+unset ANTHROPIC_API_KEY
 
 export ANTHROPIC_MODEL="${CLAUDE_CODE_MODEL_ALIAS}"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="${CLAUDE_CODE_MODEL_ALIAS}"
@@ -17,4 +17,3 @@ export DISABLE_TELEMETRY="${DISABLE_TELEMETRY:-1}"
 
 printf 'Launching Claude Code via LiteLLM: %s, model=%s\n' "${ANTHROPIC_BASE_URL}" "${ANTHROPIC_MODEL}"
 exec claude "$@"
-

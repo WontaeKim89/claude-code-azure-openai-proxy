@@ -2,7 +2,6 @@
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:4000",
     "ANTHROPIC_AUTH_TOKEN": "sk-local-claude-code-proxy",
-    "ANTHROPIC_API_KEY": "sk-local-claude-code-proxy",
     "ANTHROPIC_MODEL": "gpt-5.5",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "gpt-5.5",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gpt-5.5",
@@ -10,4 +9,3 @@
     "DISABLE_TELEMETRY": "1"
   }
 }
-
