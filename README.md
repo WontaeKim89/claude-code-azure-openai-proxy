@@ -114,13 +114,9 @@ cd /path/to/your/project
 
 Claude Code 화면에서 API key 사용 여부를 물어보면 `Yes`를 선택하세요. 이 키는 실제 Anthropic 키가 아니라 로컬 LiteLLM 프록시에 접근하기 위한 키입니다.
 
-이 실행 스크립트는 기본적으로 전역 Claude Code 설정을 쓰지 않고, 이 레포 안의 `.claude-runtime/`을 임시 설정 디렉터리로 사용합니다. 이렇게 하면 개인 PC의 전역 훅, 플러그인, 메모리 도구가 붙어서 OpenAI 계열 모델에 불필요한 컨텍스트가 들어가는 문제를 줄일 수 있습니다.
+이 실행 스크립트는 기존 전역 Claude Code 설정인 `~/.claude`를 그대로 사용합니다. `CLAUDE_CONFIG_DIR`을 바꾸지 않고, 권한 설정, status line, `claude-hud`, 플러그인, 훅도 건드리지 않습니다.
 
-전역 Claude Code 설정을 그대로 쓰고 싶다면 `.env`에서 아래 값을 바꾸세요.
-
-```bash
-CLAUDE_CODE_USE_CLEAN_CONFIG=0
-```
+즉 `claude`를 직접 실행했을 때와 동일한 Claude Code 환경에서, 모델 요청 경로만 LiteLLM/Azure OpenAI로 바뀝니다.
 
 ## 종료 방법
 
@@ -155,7 +151,6 @@ ANTHROPIC_MODEL=gpt-5.5
 ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.5
 ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.5
 CLAUDE_CODE_SUBAGENT_MODEL=gpt-5.5
-CLAUDE_CONFIG_DIR=/path/to/this-repo/.claude-runtime
 ```
 
 Claude Code 입장에서는 `http://127.0.0.1:4000`에 있는 Anthropic 호환 API를 호출합니다. 실제로는 LiteLLM이 이 요청을 Azure OpenAI 요청으로 변환합니다.
@@ -181,11 +176,10 @@ POST /v1/messages?beta=true HTTP/1.1" 200 OK
 
 그런데 단순 인사에도 `I'm sorry, but I cannot assist with that request.` 같은 답변이 나오면 보통 연결 문제가 아니라 Claude Code의 전역 훅/플러그인/메모리 컨텍스트가 OpenAI 계열 모델과 맞지 않게 섞인 상태입니다.
 
-이 레포의 기본 실행 방식은 `.claude-runtime/` 격리 설정을 사용하므로, 아래 순서로 새 세션을 다시 여세요.
+먼저 `claude-mem` 같은 메모리 플러그인이 남아 있는지 정리합니다.
 
 ```bash
-make restart
-make claude
+make purge-claude-mem
 ```
 
 이미 열려 있는 Claude Code 화면에서는 `/exit`로 종료한 뒤 다시 실행하는 것이 가장 깔끔합니다.
@@ -197,7 +191,7 @@ make claude
 따라서 아래 원칙을 지키는 것이 좋습니다.
 
 - 프록시 실행은 이 레포의 `make claude` 또는 `scripts/claude-via-azure-openai.sh`로만 시작합니다.
-- 전역 Claude Code 플러그인과 훅은 사용하지 않습니다.
+- 기존 Claude Code 전역 설정은 그대로 사용합니다.
 - 메모리/관측/자동요약 플러그인은 OpenAI 계열 모델에서 토큰 사용량과 오류를 크게 늘릴 수 있으므로 끕니다.
 - Claude Code 고급 기능 중 일부는 Anthropic 모델 기준으로 동작하므로, Azure OpenAI에서는 간단한 코드 작업부터 검증합니다.
 - 문제가 생기면 먼저 `make test`로 LiteLLM 연결을 확인하고, 그 다음 `make claude`로 Claude Code 레벨을 확인합니다.
