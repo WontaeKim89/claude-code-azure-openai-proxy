@@ -304,6 +304,260 @@ AZURE_DEPLOYMENT_NAME=your-gpt-55-deployment-name
 - 여러 명이 공용 서버에서 프록시를 공유한다면 `LITELLM_MASTER_KEY`를 반드시 바꾸고 접근 제어를 따로 설정하세요.
 - 기본 프록시 주소는 `127.0.0.1`입니다. 외부 접속을 열어야 하는 상황이 아니라면 변경하지 마세요.
 
+## Windows 제한망/폐쇄망 배포 가이드
+
+이 섹션은 인터넷 접속이 제한된 Windows 개발 환경에서 Claude Code를 Azure OpenAI 프록시와 함께 쓰기 위한 배포 방식입니다. 내부 보안 정책에 맞춰 승인된 파일만 반입하고, 무결성 검증 결과를 남기는 것을 전제로 합니다.
+
+중요한 전제:
+
+- Claude Code 실행 파일은 반입 설치할 수 있습니다.
+- 이 레포와 LiteLLM 프록시도 내부망에 배포할 수 있습니다.
+- 단, 모델 요청은 결국 Azure OpenAI 또는 내부 LLM Gateway에 도달해야 합니다.
+- 완전 물리 폐쇄망에서 Azure OpenAI endpoint로 나갈 수 없다면 이 방식으로 모델 호출은 불가능합니다.
+- Azure OpenAI Private Endpoint, ExpressRoute, 사내 전용망, 내부 API Gateway 등 승인된 경로가 있어야 합니다.
+
+권장 구조:
+
+```text
+Windows 개발 PC
+  -> Claude Code
+  -> 로컬 LiteLLM 프록시 또는 내부 공용 LiteLLM 프록시
+  -> Azure OpenAI Private Endpoint / 내부 LLM Gateway
+  -> Azure OpenAI GPT-5.5 배포
+```
+
+### 케이스 A: 개발자 PC마다 로컬 프록시 실행
+
+각 Windows PC에 Claude Code와 LiteLLM을 설치하고, 프록시를 `127.0.0.1:4000`으로 띄우는 방식입니다.
+
+장점:
+
+- 사용자별 API key와 설정 분리가 쉽습니다.
+- 장애가 한 사용자 PC에만 한정됩니다.
+- 이 레포의 기본 구조와 가장 비슷합니다.
+
+단점:
+
+- PC마다 Python/Docker/LiteLLM 실행 환경이 필요합니다.
+- 버전 관리와 업데이트 배포를 사용자가 따라야 합니다.
+
+사용 흐름:
+
+```text
+PowerShell 1: LiteLLM 프록시 실행
+PowerShell 2: Claude Code 실행
+```
+
+### 케이스 B: 내부망에 공용 LiteLLM 프록시 운영
+
+개발자 PC에는 Claude Code만 설치하고, LiteLLM은 내부 서버에서 운영하는 방식입니다.
+
+장점:
+
+- 개발자 PC 설치 항목이 줄어듭니다.
+- Azure OpenAI key를 중앙에서 관리할 수 있습니다.
+- 로깅, rate limit, 모델 라우팅을 한 곳에서 관리하기 좋습니다.
+
+단점:
+
+- 내부 프록시 서버가 공용 장애 지점이 됩니다.
+- 인증, 접근 제어, 감사 로그 설계가 필요합니다.
+- `ANTHROPIC_BASE_URL`을 내부 프록시 주소로 바꿔야 합니다.
+
+예시:
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "https://llm-gateway.internal.example.com"
+$env:ANTHROPIC_AUTH_TOKEN = "내부_프록시_토큰"
+$env:ANTHROPIC_MODEL = "gpt-5.5"
+$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "gpt-5.5"
+$env:ANTHROPIC_DEFAULT_HAIKU_MODEL = "gpt-5.5"
+claude
+```
+
+### Windows용 Claude Code 설치 파일 준비
+
+외부망 준비 PC에서 Windows용 Claude Code 설치 artifact를 준비합니다. Anthropic 공식 문서 기준으로 Claude Code native installer는 Windows PowerShell 설치를 지원합니다.
+
+공식 문서:
+
+- Claude Code 설치: <https://docs.anthropic.com/en/docs/claude-code/setup>
+- Claude Code Quickstart: <https://docs.anthropic.com/en/docs/claude-code/quickstart>
+
+외부망에서 일반 설치를 검증할 때의 공식 PowerShell 설치 방식:
+
+```powershell
+irm https://claude.ai/install.ps1 | iex
+```
+
+제한망 반입용으로는 위 명령을 내부망 PC에서 바로 실행하는 방식이 아니라, 외부망 준비 PC에서 공식 installer가 내려받는 Windows용 native artifact를 확보하고 검증한 뒤 내부 승인 저장소로 옮기는 흐름을 권장합니다. artifact URL이나 파일명은 버전에 따라 바뀔 수 있으므로 README에 고정하지 않습니다.
+
+권장 순서:
+
+1. 외부망 준비 PC에서 공식 installer 또는 기존 `claude install` 경로로 Windows용 native 설치를 먼저 검증합니다.
+2. 설치 과정에서 확보한 Windows용 Claude Code artifact, manifest, signature, checksum을 함께 보관합니다.
+3. 공식 문서의 manifest/signature/checksum 절차로 무결성을 검증합니다.
+4. 검증 결과, 버전, 파일명, SHA256 값을 기록합니다.
+5. 내부 보안 절차에 따라 승인된 저장소나 파일 배포 경로에 올립니다.
+6. Windows 개발 PC에서 설치합니다.
+
+검증 시 확인할 것:
+
+- Claude Code 버전
+- OS/아키텍처: Windows x64 또는 Windows ARM64
+- SHA256 checksum
+- Anthropic release signing key fingerprint
+- 내부 반입 승인 이력
+
+공식 문서에서 공개된 Anthropic release signing key fingerprint:
+
+```text
+31DD DE24 DDFA B679 F42D  7BD2 BAA9 29FF 1A7E CACE
+```
+
+주의:
+
+- 검증되지 않은 블로그, 미러, 개인 저장소의 설치 파일은 사용하지 마세요.
+- 설치 스크립트가 특정 시점에 내려받는 파일명과 경로를 문서에 하드코딩하지 마세요. 버전이 바뀌면 깨지고, 잘못된 artifact를 고정할 위험이 있습니다.
+- npm 방식으로 반입할 경우 `@anthropic-ai/claude-code` 본 패키지뿐 아니라 Windows 플랫폼용 optional dependency까지 같이 준비해야 합니다.
+- 조직 표준이 없다면 Windows에서는 native binary 또는 공식 패키지 기반 배포가 npm 복사보다 운영하기 쉽습니다.
+
+### Windows에서 LiteLLM 준비
+
+인터넷이 제한된 Windows 환경에서는 `uvx`가 즉석에서 LiteLLM을 다운로드하지 못합니다. 아래 둘 중 하나를 선택하세요.
+
+#### 방식 1: Docker 이미지 반입
+
+Docker Desktop 또는 사내 컨테이너 런타임 사용이 가능하면 가장 단순합니다.
+
+외부망 준비 PC:
+
+```powershell
+docker pull ghcr.io/berriai/litellm:main-latest
+docker save ghcr.io/berriai/litellm:main-latest -o litellm-main-latest.tar
+```
+
+운영 배포에서는 `main-latest` 대신 내부 검증이 끝난 고정 버전 태그를 사용하는 것을 권장합니다.
+
+내부망 Windows PC:
+
+```powershell
+docker load -i .\litellm-main-latest.tar
+```
+
+그 다음 이 레포의 `config/litellm.config.yaml`을 기준으로 내부 환경에 맞는 실행 스크립트를 만듭니다.
+
+#### 방식 2: Python wheelhouse 반입
+
+Docker를 사용할 수 없으면 외부망에서 Python wheel 파일을 모두 받아 내부망으로 옮깁니다.
+
+외부망 준비 PC:
+
+```powershell
+mkdir wheelhouse
+pip download "litellm[proxy]" -d wheelhouse
+```
+
+내부망 Windows PC:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install --no-index --find-links .\wheelhouse "litellm[proxy]"
+```
+
+이 방식은 Python 버전과 OS/아키텍처가 외부망 준비 PC와 내부망 PC에서 맞아야 합니다.
+
+### Windows용 환경 파일 예시
+
+PowerShell에서는 `.env`를 자동으로 source하지 않습니다. Windows 전용으로는 `.ps1` 실행 스크립트를 별도로 두는 것을 권장합니다.
+
+예시 `Start-Proxy.ps1`:
+
+```powershell
+$env:AZURE_API_KEY = "여기에_Azure_OpenAI_API_Key_입력"
+$env:AZURE_API_BASE = "https://your-resource-name.openai.azure.com"
+$env:AZURE_API_VERSION = "2025-03-01-preview"
+$env:AZURE_DEPLOYMENT_NAME = "your-gpt-55-deployment-name"
+$env:LITELLM_MASTER_KEY = "sk-local-claude-code-proxy"
+
+litellm --config .\config\litellm.config.yaml --host 127.0.0.1 --port 4000
+```
+
+예시 `Start-Claude-Via-AzureOpenAI.ps1`:
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:4000"
+$env:ANTHROPIC_AUTH_TOKEN = "sk-local-claude-code-proxy"
+Remove-Item Env:\ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+
+$env:ANTHROPIC_MODEL = "gpt-5.5"
+$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "gpt-5.5"
+$env:ANTHROPIC_DEFAULT_HAIKU_MODEL = "gpt-5.5"
+$env:CLAUDE_CODE_SUBAGENT_MODEL = "gpt-5.5"
+
+$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
+$env:DISABLE_TELEMETRY = "1"
+$env:CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL = "1"
+$env:CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE = "1"
+
+claude
+```
+
+이 PowerShell 예시는 기존 Claude Code 전역 설정을 그대로 사용합니다. `CLAUDE_CONFIG_DIR`을 바꾸지 않으므로 기존 권한 설정, status line, 플러그인, 훅은 그대로 유지됩니다.
+
+### Windows에서 실행 순서
+
+1. PowerShell 1에서 프록시 실행
+
+```powershell
+.\Start-Proxy.ps1
+```
+
+2. PowerShell 2에서 프록시 테스트
+
+```powershell
+curl.exe http://127.0.0.1:4000/v1/messages `
+  -H "Authorization: Bearer sk-local-claude-code-proxy" `
+  -H "x-api-key: sk-local-claude-code-proxy" `
+  -H "anthropic-version: 2023-06-01" `
+  -H "content-type: application/json" `
+  -d "{ `"model`": `"gpt-5.5`", `"max_tokens`": 64, `"messages`": [{ `"role`": `"user`", `"content`": `"Reply with one short sentence confirming the proxy works.`" }] }"
+```
+
+3. PowerShell 2에서 Claude Code 실행
+
+```powershell
+.\Start-Claude-Via-AzureOpenAI.ps1
+```
+
+### 제한망에서 기능별 기대 동작
+
+| 기능 | 기대 동작 |
+| --- | --- |
+| 코드 읽기/수정 | 정상 동작 |
+| Bash/PowerShell 도구 | 로컬 PC 권한 범위에서 동작 |
+| Claude Code status line / claude-hud | 해당 플러그인이 내부망에 설치되어 있으면 동작 |
+| WebSearch/WebFetch | 외부 인터넷 차단 시 실패 가능 |
+| Plugin marketplace 자동 설치 | 차단 권장 |
+| GitHub App / 외부 SaaS MCP | 내부망 접근 정책에 따라 실패 가능 |
+| Azure OpenAI 모델 호출 | Private Endpoint/Gateway 경로가 있으면 동작 |
+
+### 제한망 운영 체크리스트
+
+- Windows용 Claude Code 설치 artifact를 공식 출처에서 확보했습니다.
+- 설치 artifact의 checksum/signature를 검증했습니다.
+- Azure OpenAI endpoint가 내부망에서 접근 가능합니다.
+- LiteLLM 실행 방식이 정해졌습니다: 로컬 Docker, 로컬 Python, 또는 내부 공용 프록시.
+- `ANTHROPIC_BASE_URL`이 LiteLLM 주소를 가리킵니다.
+- `ANTHROPIC_AUTH_TOKEN`과 LiteLLM master key가 일치합니다.
+- `ANTHROPIC_API_KEY`는 설정하지 않습니다.
+- `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`을 설정했습니다.
+- `DISABLE_TELEMETRY=1`을 설정했습니다.
+- `CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL=1`을 설정했습니다.
+- 필요한 플러그인은 내부망에 사전 배포했습니다.
+- `claude-mem` 같은 토큰 과다 사용 플러그인은 제외했습니다.
+
 ## GitHub에 올리는 방법
 
 처음 원격 저장소를 만들 때:
