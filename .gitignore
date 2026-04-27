@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 .generated/
+.claude-runtime/
 
 __pycache__/
 .pytest_cache/
