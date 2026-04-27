@@ -1,4 +1,4 @@
-.PHONY: setup proxy stop restart test claude doctor
+.PHONY: setup proxy stop restart test claude alias doctor
 
 setup:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env. Fill Azure OpenAI values before running proxy."; else echo ".env already exists."; fi
@@ -23,6 +23,9 @@ test:
 
 claude:
 	./scripts/claude-via-azure-openai.sh
+
+alias:
+	./scripts/install-alias.sh
 
 doctor:
 	@command -v claude >/dev/null && claude --version || (echo "claude CLI not found" && exit 1)

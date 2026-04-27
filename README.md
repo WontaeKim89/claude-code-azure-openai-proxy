@@ -65,6 +65,36 @@ make doctor
 
 터미널을 2개 열어서 사용합니다.
 
+## 어느 레포에서든 쉽게 실행하기
+
+매번 긴 스크립트 경로를 입력하지 않으려면 alias를 한 번만 등록합니다.
+
+```bash
+cd /Users/gim-wontae/Desktop/Persnal_Project/claude-code-azure-openai-proxy
+make alias
+source ~/.zshrc
+```
+
+`make alias`는 두 가지를 설정합니다.
+
+- `~/.zshrc`에 `claude-azure` alias 등록
+- `~/.local/bin/claude-azure` 실행 파일 shim 생성
+
+이후부터는 작업하려는 프로젝트 폴더로 먼저 이동한 뒤 `claude-azure`만 실행하면 됩니다.
+
+```bash
+cd /Users/gim-wontae/Desktop/PROJECT/HanwhaGeneralInsurance-Agent
+claude-azure
+```
+
+중요한 점:
+
+- `claude-azure`는 현재 터미널의 작업 디렉토리에서 Claude Code를 실행합니다.
+- 그래서 먼저 작업할 레포로 `cd`한 다음 실행해야 합니다.
+- 기존 Claude Code 전역 설정은 그대로 사용하고, 모델 요청 경로만 LiteLLM/Azure OpenAI로 바뀝니다.
+- alias를 다시 등록해도 기존 블록을 교체하므로 `~/.zshrc`에 중복으로 쌓이지 않습니다.
+- 이미 열린 터미널에서 alias가 바로 안 잡히면 `source ~/.zshrc`를 한 번 실행하세요.
+
 ### 터미널 1: 프록시 실행
 
 ```bash
