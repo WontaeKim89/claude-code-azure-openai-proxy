@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ensure-env.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/ensure-env.sh"
+source "${SCRIPT_DIR}/proxy-runtime.sh"
 
 export ANTHROPIC_BASE_URL="http://${LITELLM_HOST}:${LITELLM_PORT}"
 export ANTHROPIC_AUTH_TOKEN="${LITELLM_MASTER_KEY}"
@@ -15,6 +17,58 @@ export CLAUDE_CODE_SUBAGENT_MODEL="${CLAUDE_CODE_MODEL_ALIAS}"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-1}"
 export DISABLE_TELEMETRY="${DISABLE_TELEMETRY:-1}"
 
+session_id="session-$$"
+claude_pid=""
+session_acquired=0
+cleanup_started=0
+
+cleanup() {
+  local exit_code="${1:-$?}"
+
+  if (( cleanup_started == 1 )); then
+    return
+  fi
+  cleanup_started=1
+  trap - EXIT INT TERM HUP
+
+  if [[ -n "${claude_pid}" ]] && process_is_alive "${claude_pid}"; then
+    kill -TERM "${claude_pid}" 2>/dev/null || true
+    wait "${claude_pid}" 2>/dev/null || true
+  fi
+  if (( session_acquired == 1 )); then
+    proxy_session_release "${session_id}" || true
+    session_acquired=0
+  fi
+  exit "${exit_code}"
+}
+
+forward_signal() {
+  local signal="$1"
+
+  if [[ -n "${claude_pid}" ]] && process_is_alive "${claude_pid}"; then
+    kill -"${signal}" "${claude_pid}" 2>/dev/null || true
+  fi
+}
+
+trap 'cleanup $?' EXIT
+trap 'forward_signal INT' INT
+trap 'forward_signal TERM' TERM
+trap 'forward_signal HUP' HUP
+
+if proxy_session_acquire "${session_id}"; then
+  session_acquired=1
+else
+  exit 1
+fi
+
 printf 'Launching Claude Code via LiteLLM: %s, model=%s\n' "${ANTHROPIC_BASE_URL}" "${ANTHROPIC_MODEL}"
 printf 'Using Claude Code config unchanged: %s\n' "${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
-exec claude "$@"
+
+set +e
+claude "$@" <&0 &
+claude_pid=$!
+wait "${claude_pid}"
+claude_exit_code=$?
+set -e
+claude_pid=""
+cleanup "${claude_exit_code}"

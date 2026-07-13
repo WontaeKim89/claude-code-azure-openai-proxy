@@ -1,4 +1,4 @@
-.PHONY: setup proxy stop restart test claude alias doctor
+.PHONY: setup proxy stop stop-force status restart test test-lifecycle claude alias doctor
 
 setup:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env. Fill Azure OpenAI values before running proxy."; else echo ".env already exists."; fi
@@ -7,19 +7,22 @@ proxy:
 	./scripts/start-proxy.sh
 
 stop:
-	@PIDS=$$(lsof -tiTCP:$${LITELLM_PORT:-4000} -sTCP:LISTEN 2>/dev/null || true); \
-	if [ -z "$$PIDS" ]; then \
-		echo "No LiteLLM proxy is listening on port $${LITELLM_PORT:-4000}."; \
-	else \
-		echo "Stopping processes on port $${LITELLM_PORT:-4000}: $$PIDS"; \
-		kill $$PIDS; \
-	fi
+	./scripts/proxy-runtime.sh stop
+
+stop-force:
+	./scripts/proxy-runtime.sh stop --force
+
+status:
+	./scripts/proxy-runtime.sh status
 
 restart: stop
 	$(MAKE) proxy
 
 test:
 	./scripts/test-proxy.sh
+
+test-lifecycle:
+	./tests/test-lifecycle.sh
 
 claude:
 	./scripts/claude-via-azure-openai.sh
