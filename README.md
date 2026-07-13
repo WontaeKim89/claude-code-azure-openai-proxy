@@ -8,69 +8,90 @@ Claude Code는 OpenAI/Azure OpenAI API 키를 직접 넣는 방식을 공식 지
 Claude Code -> LiteLLM 프록시 -> Azure OpenAI GPT-5.5 배포
 ```
 
-## 한 번만 준비할 것
+## 빠른 시작: clone부터 첫 실행까지
 
-아래 프로그램이 설치되어 있어야 합니다.
+Linux/macOS 기준으로 아래 프로그램과 Azure OpenAI 배포가 필요합니다.
 
 - Claude Code CLI
 - `uvx`
+- `curl`
+- `make`
 - Azure OpenAI GPT-5.5 배포
 
-설치 여부는 아래 명령으로 확인합니다.
+설치 여부를 확인합니다.
 
 ```bash
 claude --version
 uvx --version
+curl --version
+make --version
 ```
 
-## 처음 설정하기
-
-레포 폴더로 이동합니다.
+저장소를 clone하고 `.env`를 만듭니다.
 
 ```bash
-cd /Users/gim-wontae/Desktop/Persnal_Project/claude-code-azure-openai-proxy
-```
-
-`.env` 파일을 만듭니다.
-
-```bash
+git clone https://github.com/WontaeKim89/claude-code-azure-openai-proxy.git
+cd claude-code-azure-openai-proxy
 make setup
 ```
 
-`.env` 파일을 열고 Azure OpenAI 정보를 입력합니다.
+`.env`를 열어 Azure OpenAI 배포 정보를 입력합니다.
 
-```bash
+```dotenv
 AZURE_API_KEY=여기에_Azure_OpenAI_API_Key_입력
 AZURE_API_BASE=https://your-resource-name.openai.azure.com
 AZURE_API_VERSION=2025-03-01-preview
 AZURE_DEPLOYMENT_NAME=your-gpt-55-deployment-name
+
+LITELLM_HOST=127.0.0.1
+LITELLM_PORT=4000
+LITELLM_MASTER_KEY=sk-local-claude-code-proxy
+CLAUDE_CODE_MODEL_ALIAS=gpt-5.5
 ```
+
+설정과 자동 수명 주기를 확인한 뒤 `claude-azure` 명령을 설치합니다.
+
+```bash
+make doctor
+make test-lifecycle
+make alias
+source ~/.zshrc
+```
+
+`make test-lifecycle`은 mock 프록시를 사용하므로 Azure 요청이나 모델 사용 비용이 발생하지 않습니다. 정상이라면 `All lifecycle tests passed.`가 출력됩니다.
+
+이제 작업하려는 프로젝트로 이동해 실행합니다.
+
+```bash
+cd /path/to/your/project
+claude-azure
+```
+
+`claude-azure`가 LiteLLM을 자동으로 시작하고, 마지막 Claude Code 세션이 끝나면 자신이 시작한 프록시를 자동 종료합니다. 별도로 `make proxy`를 먼저 실행할 필요가 없습니다.
 
 주의할 점:
 
 - `AZURE_API_BASE`는 Azure OpenAI 리소스의 endpoint입니다.
 - `AZURE_DEPLOYMENT_NAME`은 모델 이름이 아니라 Azure에서 만든 deployment name입니다.
 - `AZURE_API_VERSION`은 `2025-03-01-preview` 이상이어야 합니다.
+- `LITELLM_MASTER_KEY`는 Claude Code와 로컬 LiteLLM 사이에서 사용하는 로컬 인증 키입니다. 실제 Anthropic API 키가 아닙니다.
+- `LITELLM_HOST`는 외부에 노출되지 않도록 기본값 `127.0.0.1` 사용을 권장합니다.
+- `CLAUDE_CODE_MODEL_ALIAS`는 Claude Code에 노출할 이름이며 Azure deployment name과 달라도 됩니다.
 - `.env`는 Git에 올라가지 않도록 무시 처리되어 있습니다.
-
-설정이 맞는지 확인합니다.
-
-```bash
-make doctor
-```
-
-`env ok`가 나오면 준비가 끝난 것입니다.
+- `make doctor`에서 `env ok`가 나오면 환경 설정 검사가 완료된 것입니다.
+- `claude-azure`를 찾지 못하면 `source ~/.zshrc`를 실행하세요. shim을 직접 사용할 경우에는 `~/.local/bin`이 `PATH`에 포함되어 있어야 합니다.
+- 저장소를 이동했다면 새 경로에서 `make alias`를 다시 실행하세요.
 
 ## 매번 사용하는 방법
 
-터미널을 2개 열어서 사용합니다.
+처음 한 번 alias를 설치한 뒤에는 작업할 프로젝트 디렉터리에서 `claude-azure`만 실행합니다. LiteLLM 프록시는 자동으로 백그라운드에서 시작되고, 마지막 Claude Code 세션이 끝나면 자동으로 종료됩니다.
 
 ## 어느 레포에서든 쉽게 실행하기
 
 매번 긴 스크립트 경로를 입력하지 않으려면 alias를 한 번만 등록합니다.
 
 ```bash
-cd /Users/gim-wontae/Desktop/Persnal_Project/claude-code-azure-openai-proxy
+cd /path/to/claude-code-azure-openai-proxy
 make alias
 source ~/.zshrc
 ```
@@ -83,7 +104,7 @@ source ~/.zshrc
 이후부터는 작업하려는 프로젝트 폴더로 먼저 이동한 뒤 `claude-azure`만 실행하면 됩니다.
 
 ```bash
-cd /Users/gim-wontae/Desktop/PROJECT/HanwhaGeneralInsurance-Agent
+cd /path/to/your/project
 claude-azure
 ```
 
@@ -94,22 +115,39 @@ claude-azure
 - 기존 Claude Code 전역 설정은 그대로 사용하고, 모델 요청 경로만 LiteLLM/Azure OpenAI로 바뀝니다.
 - alias를 다시 등록해도 기존 블록을 교체하므로 `~/.zshrc`에 중복으로 쌓이지 않습니다.
 - 이미 열린 터미널에서 alias가 바로 안 잡히면 `source ~/.zshrc`를 한 번 실행하세요.
+- 저장소를 다른 경로로 옮겼다면 새 경로에서 `make alias`를 다시 실행하세요.
 
-### 터미널 1: 프록시 실행
+### 프록시 자동 수명 주기
+
+`claude-azure`는 다음 순서로 동작합니다.
+
+1. 이 저장소의 `.env`를 읽고 LiteLLM 상태를 확인합니다.
+2. 프록시가 없으면 `.claude-runtime/`에 로그와 PID 정보를 두고 백그라운드로 시작합니다.
+3. 프록시가 준비된 뒤 현재 디렉터리에서 Claude Code를 실행합니다.
+4. 동시에 여러 `claude-azure` 세션이 있으면 프록시 하나를 공유합니다.
+5. 마지막 세션이 끝나면 이 launcher가 시작한 프록시만 자동 종료합니다.
+
+사용자가 `make proxy` 등으로 미리 실행한 호환 프록시는 재사용하지만 `claude-azure`가 소유하지 않으므로 자동으로 종료하지 않습니다. 같은 포트에 인증되지 않은 다른 서비스가 있으면 해당 프로세스를 종료하지 않고 시작 오류를 표시합니다.
+
+수동으로 프록시 로그와 상태를 확인할 수 있습니다.
 
 ```bash
-cd /Users/gim-wontae/Desktop/Persnal_Project/claude-code-azure-openai-proxy
+make status
+tail -f .claude-runtime/proxy.log
+```
+
+프록시 자체를 디버깅할 때만 포그라운드 실행을 사용합니다.
+
+```bash
 make proxy
 ```
 
-이 터미널은 Claude Code를 쓰는 동안 계속 켜두세요. 닫으면 Claude Code가 Azure OpenAI로 요청을 보낼 수 없습니다.
-
-### 터미널 2: 연결 테스트
+### 연결 테스트
 
 처음 실행할 때는 프록시가 잘 동작하는지 확인합니다.
 
 ```bash
-cd /Users/gim-wontae/Desktop/Persnal_Project/claude-code-azure-openai-proxy
+cd /path/to/claude-code-azure-openai-proxy
 make test
 ```
 
@@ -127,7 +165,7 @@ make test
 }
 ```
 
-### 터미널 2: Claude Code 실행
+### Claude Code 실행
 
 현재 레포에서 Claude Code를 실행하려면 아래 명령을 씁니다.
 
@@ -139,7 +177,7 @@ make claude
 
 ```bash
 cd /path/to/your/project
-/Users/gim-wontae/Desktop/Persnal_Project/claude-code-azure-openai-proxy/scripts/claude-via-azure-openai.sh
+/path/to/claude-code-azure-openai-proxy/scripts/claude-via-azure-openai.sh
 ```
 
 Claude Code 화면에서 API key 사용 여부를 물어보면 `Yes`를 선택하세요. 이 키는 실제 Anthropic 키가 아니라 로컬 LiteLLM 프록시에 접근하기 위한 키입니다.
@@ -150,25 +188,31 @@ Claude Code 화면에서 API key 사용 여부를 물어보면 `Yes`를 선택�
 
 ## 종료 방법
 
-Claude Code는 Claude Code 화면에서 종료합니다.
+Claude Code 화면에서 종료하면 됩니다.
 
 ```text
 /exit
 ```
 
-프록시는 `make proxy`가 실행 중인 터미널에서 `Ctrl-C`로 종료합니다.
+마지막 `claude-azure` 세션이면 자동으로 시작했던 LiteLLM도 함께 종료됩니다. 상태가 궁금하면 다음 명령을 사용합니다.
 
-터미널을 잃어버렸거나 예전 프록시가 계속 살아 있으면 아래 명령으로 4000번 포트의 프록시를 종료할 수 있습니다.
+```bash
+make status
+```
+
+비정상 종료 뒤 managed 프록시가 남아 있으면 안전하게 종료할 수 있습니다. 활성 Claude 세션이 있으면 `make stop`은 중단하여 다른 세션을 보호합니다.
 
 ```bash
 make stop
 ```
 
-프록시를 완전히 재시작하려면 아래 명령을 씁니다.
+활성 세션을 중단해도 되는 경우에만 강제 관리 종료를 사용합니다.
 
 ```bash
-make restart
+make stop-force
 ```
+
+이 명령들은 이 저장소가 관리하는 프로세스만 종료하며, 같은 포트의 외부 프로세스는 종료하지 않습니다. 포그라운드 `make proxy`를 실행했다면 해당 터미널에서 `Ctrl-C`로 종료합니다.
 
 ## 내부 동작 방식
 
@@ -202,7 +246,7 @@ model_list:
 
 따라서 아래 원칙을 지키는 것이 좋습니다.
 
-- 프록시 실행은 이 레포의 `make claude` 또는 `scripts/claude-via-azure-openai.sh`로만 시작합니다.
+- 일반 사용은 `make claude`, `claude-azure` 또는 `scripts/claude-via-azure-openai.sh`로 시작해 프록시 수명 주기를 자동 관리합니다.
 - 기존 Claude Code 전역 설정은 그대로 사용합니다.
 - Claude Code 고급 기능 중 일부는 Anthropic 모델 기준으로 동작하므로, Azure OpenAI에서는 간단한 코드 작업부터 검증합니다.
 - 문제가 생기면 먼저 `make test`로 LiteLLM 연결을 확인하고, 그 다음 `make claude`로 Claude Code 레벨을 확인합니다.
